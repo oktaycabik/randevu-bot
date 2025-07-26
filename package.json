@@ -1,0 +1,23 @@
+{
+  "name": "appointment-bot",
+  "version": "1.0.0",
+  "description": "Automated appointment booking bot with form monitoring",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "jest",
+    "demo": "node src/index.js -d"
+  },
+  "dependencies": {
+    "puppeteer": "^21.0.0",
+    "dotenv": "^16.0.0",
+    "node-notifier": "^10.0.0",
+    "winston": "^3.10.0",
+    "express": "^4.18.2",
+    "commander": "^11.0.0"
+  },
+  "devDependencies": {
+    "jest": "^29.6.2",
+    "nodemon": "^3.0.1"
+  }
+} 
