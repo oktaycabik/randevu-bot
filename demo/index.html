@@ -156,14 +156,23 @@
                 setTimeout(() => {
                     loadingSpinner.style.display = 'none';
                     
-                    // Increase success rate after failures
-                    const successRate = formOpenCount >= maxFailures ? 0.9 : 0.7;
+                    // İlk 3 kullanıcı için %90 başarı şansı
+                    const successRate = formOpenCount < 3 ? 0.9 : 0.7;
                     const isSuccess = Math.random() < successRate;
                     
                     if (isSuccess) {
                         successMessage.style.display = 'block';
                         formOpenCount = 0; // Reset counter on success
                     } else {
+                        // Başarısız olma nedenini belirt
+                        const reasons = [
+                            'Sistem yoğun, lütfen tekrar deneyin.',
+                            'Kontenjan doldu, sonraki randevuyu bekleyin.',
+                            'Doğrulama hatası, bilgileri kontrol edin.',
+                            'Sunucu yanıt vermiyor, tekrar deneyin.'
+                        ];
+                        const randomReason = reasons[Math.floor(Math.random() * reasons.length)];
+                        errorMessage.querySelector('p').textContent = randomReason;
                         errorMessage.style.display = 'block';
                         formOpenCount++; // Increment failure counter
                     }

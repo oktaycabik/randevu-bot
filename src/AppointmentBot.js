@@ -9,12 +9,13 @@ class AppointmentBot {
         this.page = null;
         this.retryCount = 0;
         this.lastFormStatus = false;
+        this.currentUserIndex = 0;
     }
 
     async initialize() {
         try {
             this.browser = await puppeteer.launch({
-                headless: false, // Görünür mod
+                headless: false,
                 defaultViewport: null,
                 args: ['--start-maximized']
             });
@@ -30,6 +31,7 @@ class AppointmentBot {
             
             logger.info('Browser initialized successfully');
             console.log('\x1b[32m%s\x1b[0m', '🚀 Bot başlatıldı ve hazır!');
+            console.log('\x1b[36m%s\x1b[0m', `📋 Toplam ${config.users.length} kullanıcı için randevu denenecek`);
         } catch (error) {
             logger.error('Failed to initialize browser', { error: error.message });
             throw error;
@@ -38,7 +40,6 @@ class AppointmentBot {
 
     async checkFormAvailability() {
         try {
-            // Sayfayı yenile
             await this.page.reload({ waitUntil: 'networkidle0' });
 
             const isFormAvailable = await this.page.evaluate(() => {
@@ -49,12 +50,12 @@ class AppointmentBot {
                 return isVisible && !isClosed;
             });
 
-            // Form durumu değiştiğinde bildirim gönder
             if (isFormAvailable !== this.lastFormStatus) {
                 this.lastFormStatus = isFormAvailable;
                 if (isFormAvailable) {
-                    await NotificationService.info('Form açıldı! Doldurmaya başlıyorum...');
-                    console.log('\x1b[32m%s\x1b[0m', '✨ FORM AÇILDI! Doldurulmaya başlanıyor...');
+                    const currentUser = config.users[this.currentUserIndex];
+                    await NotificationService.info(`Form açıldı! ${currentUser.firstName} ${currentUser.lastName} için doldurmaya başlıyorum...`);
+                    console.log('\x1b[32m%s\x1b[0m', `✨ FORM AÇILDI! ${currentUser.firstName} ${currentUser.lastName} için doldurulmaya başlanıyor...`);
                 } else {
                     console.log('\x1b[33m%s\x1b[0m', '⏳ Form şu anda kapalı, beklemeye devam ediyorum...');
                 }
@@ -63,34 +64,16 @@ class AppointmentBot {
             return isFormAvailable;
         } catch (error) {
             logger.error('Error checking form availability', { error: error.message });
-            // Hata durumunda sayfayı yeniden yüklemeyi dene
-            try {
-                await this.page.goto(config.appointment.url, {
-                    waitUntil: 'networkidle0',
-                    timeout: config.appointment.timeout
-                });
-            } catch (e) {
-                logger.error('Failed to reload page', { error: e.message });
-            }
             return false;
         }
     }
 
     async fillForm() {
         try {
-            console.log('\x1b[36m%s\x1b[0m', '📝 Form dolduruluyor...');
+            const currentUser = config.users[this.currentUserIndex];
+            console.log('\x1b[36m%s\x1b[0m', `📝 Form ${currentUser.firstName} ${currentUser.lastName} için dolduruluyor...`);
+            
             const selectors = config.form.selectors;
-            const userData = config.userData;
-
-            // Form görünürlüğünü kontrol et
-            const formVisible = await this.page.evaluate(() => {
-                const form = document.querySelector('form');
-                return form && window.getComputedStyle(form).display !== 'none';
-            });
-
-            if (!formVisible) {
-                throw new Error('Form artık görünür değil');
-            }
 
             // Her alan için görünürlük kontrolü ve doldurma
             for (const [field, selector] of Object.entries(selectors)) {
@@ -98,54 +81,44 @@ class AppointmentBot {
                 
                 console.log(`\x1b[36m%s\x1b[0m`, `📝 ${field} dolduruluyor...`);
                 
-                // Alanın görünür olmasını bekle
                 await this.page.waitForSelector(selector, { 
                     visible: true, 
                     timeout: 5000 
                 });
 
-                // Mevcut değeri temizle
                 await this.page.evaluate((sel) => {
                     document.querySelector(sel).value = '';
                 }, selector);
 
-                // Yeni değeri yaz
-                await this.page.type(selector, userData[field], { delay: 50 });
+                await this.page.type(selector, currentUser[field], { delay: 50 });
 
-                // Değerin doğru yazıldığını kontrol et
                 const fieldValue = await this.page.$eval(selector, el => el.value);
-                if (fieldValue !== userData[field]) {
+                if (fieldValue !== currentUser[field]) {
                     throw new Error(`${field} alanı doğru doldurulamadı`);
                 }
             }
 
             console.log('\x1b[36m%s\x1b[0m', '🔄 Form gönderiliyor...');
             
-            // Submit butonunun görünür olmasını bekle
             const submitButton = await this.page.waitForSelector('button[type="submit"]', { 
                 visible: true, 
                 timeout: 5000 
             });
 
-            // Formu gönder
             await submitButton.click();
 
-            // Loading spinner'ı bekle
             await this.page.waitForSelector('.loading-spinner', { 
                 visible: true, 
                 timeout: 5000 
-            }).catch(() => {}); // spinner görünmezse devam et
+            }).catch(() => {});
 
-            // Yanıt için bekle (en az 2 saniye)
             await new Promise(resolve => setTimeout(resolve, 2000));
 
-            // Başarı veya hata mesajını kontrol et
             const result = await this.page.evaluate(() => {
                 const successElement = document.querySelector('.success-message');
                 const errorElement = document.querySelector('.error-message');
                 const loadingElement = document.querySelector('.loading-spinner');
                 
-                // Hala yükleniyor mu kontrol et
                 if (loadingElement && window.getComputedStyle(loadingElement).display !== 'none') {
                     return { success: false, message: 'Form işlemi devam ediyor...' };
                 }
@@ -162,29 +135,39 @@ class AppointmentBot {
             });
 
             if (result.success) {
-                console.log('\x1b[32m%s\x1b[0m', '✅ BAŞARILI! Form başarıyla dolduruldu ve gönderildi!');
-                logger.info('Form submitted successfully');
-                await NotificationService.success('Form başarıyla dolduruldu ve randevu alındı!');
+                console.log('\x1b[32m%s\x1b[0m', `✅ BAŞARILI! ${currentUser.firstName} ${currentUser.lastName} için form başarıyla dolduruldu!`);
+                logger.info('Form submitted successfully', { user: `${currentUser.firstName} ${currentUser.lastName}` });
+                await NotificationService.success(`${currentUser.firstName} ${currentUser.lastName} için randevu alındı!`);
                 
-                // Ekran görüntüsü al
                 await this.page.screenshot({
-                    path: `success-${new Date().toISOString().replace(/:/g, '-')}.png`,
+                    path: `success-${currentUser.firstName}-${currentUser.lastName}-${new Date().toISOString().replace(/:/g, '-')}.png`,
                     fullPage: true
                 });
-                
-                return true;
+
+                // Sonraki kullanıcıya geç
+                this.currentUserIndex++;
+                this.retryCount = 0;
+
+                // Tüm kullanıcılar tamamlandı mı kontrol et
+                if (this.currentUserIndex >= config.users.length) {
+                    console.log('\x1b[32m%s\x1b[0m', '🎉 TÜM KULLANICILAR İÇİN İŞLEM TAMAMLANDI!');
+                    await NotificationService.success('Tüm kullanıcılar için randevu alma işlemi tamamlandı!');
+                    return true;
+                }
+
+                return false;
             } else {
                 throw new Error(result.message.replace(/\s+/g, ' '));
             }
         } catch (error) {
             const errorMessage = error.message.trim().replace(/\s+/g, ' ');
-            console.log('\x1b[31m%s\x1b[0m', `❌ HATA: ${errorMessage}`);
-            logger.error('Error filling form', { error: errorMessage });
-            await NotificationService.error(`Form doldurulurken hata: ${errorMessage}`);
+            const currentUser = config.users[this.currentUserIndex];
+            console.log('\x1b[31m%s\x1b[0m', `❌ HATA: ${currentUser.firstName} ${currentUser.lastName} için ${errorMessage}`);
+            logger.error('Error filling form', { error: errorMessage, user: `${currentUser.firstName} ${currentUser.lastName}` });
+            await NotificationService.error(`${currentUser.firstName} ${currentUser.lastName} için hata: ${errorMessage}`);
             
-            // Hata durumunda ekran görüntüsü al
             await this.page.screenshot({
-                path: `error-${new Date().toISOString().replace(/:/g, '-')}.png`,
+                path: `error-${currentUser.firstName}-${currentUser.lastName}-${new Date().toISOString().replace(/:/g, '-')}.png`,
                 fullPage: true
             }).catch(() => {});
             
@@ -199,7 +182,7 @@ class AppointmentBot {
             await NotificationService.info('Bot başlatıldı ve randevuları izliyor');
             console.log('\x1b[36m%s\x1b[0m', '🔍 Form kontrol ediliyor...');
 
-            while (true) {
+            while (this.currentUserIndex < config.users.length) {
                 const isAvailable = await this.checkFormAvailability();
 
                 if (isAvailable) {
@@ -207,13 +190,22 @@ class AppointmentBot {
                     const success = await this.fillForm();
 
                     if (success) {
-                        console.log('\x1b[32m%s\x1b[0m', '🎉 İŞLEM TAMAMLANDI! Bot kapatılıyor...');
-                        await this.cleanup();
-                        break;
+                        // Tüm kullanıcılar tamamlandıysa çık
+                        if (this.currentUserIndex >= config.users.length) {
+                            console.log('\x1b[32m%s\x1b[0m', '🎉 İŞLEM TAMAMLANDI! Bot kapatılıyor...');
+                            await this.cleanup();
+                            break;
+                        }
                     } else {
                         this.retryCount++;
                         if (this.retryCount >= config.appointment.maxRetries) {
-                            throw new Error('Maksimum deneme sayısına ulaşıldı');
+                            // Sonraki kullanıcıya geç
+                            this.currentUserIndex++;
+                            this.retryCount = 0;
+                            if (this.currentUserIndex >= config.users.length) {
+                                throw new Error('Tüm kullanıcılar için maksimum deneme sayısına ulaşıldı');
+                            }
+                            console.log('\x1b[33m%s\x1b[0m', `⚠️ Sonraki kullanıcıya geçiliyor: ${config.users[this.currentUserIndex].firstName} ${config.users[this.currentUserIndex].lastName}`);
                         }
                     }
                 }

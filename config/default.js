@@ -29,11 +29,46 @@ module.exports = {
             phoneMinLength: 10
         }
     },
-    userData: {
-        firstName: process.env.FIRST_NAME || 'John',
-        lastName: process.env.LAST_NAME || 'Doe',
-        identityNumber: process.env.IDENTITY_NUMBER || '12345678901',
-        phone: process.env.PHONE || '5551234567',
-        email: process.env.EMAIL || 'john.doe@example.com'
-    }
+    users: [
+        {
+            firstName: process.env.FIRST_NAME_1 || 'Ahmet',
+            lastName: process.env.LAST_NAME_1 || 'Yılmaz',
+            identityNumber: process.env.IDENTITY_NUMBER_1 || '12345678901',
+            phone: process.env.PHONE_1 || '5551234567',
+            email: process.env.EMAIL_1 || 'ahmet.yilmaz@example.com',
+            priority: 1
+        },
+        {
+            firstName: process.env.FIRST_NAME_2 || 'Ayşe',
+            lastName: process.env.LAST_NAME_2 || 'Demir',
+            identityNumber: process.env.IDENTITY_NUMBER_2 || '98765432109',
+            phone: process.env.PHONE_2 || '5559876543',
+            email: process.env.EMAIL_2 || 'ayse.demir@example.com',
+            priority: 2
+        },
+        {
+            firstName: process.env.FIRST_NAME_3 || 'Mehmet',
+            lastName: process.env.LAST_NAME_3 || 'Kaya',
+            identityNumber: process.env.IDENTITY_NUMBER_3 || '45678901234',
+            phone: process.env.PHONE_3 || '5554567890',
+            email: process.env.EMAIL_3 || 'mehmet.kaya@example.com',
+            priority: 3
+        },
+        {
+            firstName: process.env.FIRST_NAME_4 || 'Fatma',
+            lastName: process.env.LAST_NAME_4 || 'Şahin',
+            identityNumber: process.env.IDENTITY_NUMBER_4 || '78901234567',
+            phone: process.env.PHONE_4 || '5557890123',
+            email: process.env.EMAIL_4 || 'fatma.sahin@example.com',
+            priority: 4
+        },
+        {
+            firstName: process.env.FIRST_NAME_5 || 'Ali',
+            lastName: process.env.LAST_NAME_5 || 'Öztürk',
+            identityNumber: process.env.IDENTITY_NUMBER_5 || '23456789012',
+            phone: process.env.PHONE_5 || '5552345678',
+            email: process.env.EMAIL_5 || 'ali.ozturk@example.com',
+            priority: 5
+        }
+    ]
 }; 
